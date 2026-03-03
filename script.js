@@ -22,13 +22,11 @@ const ASSETS = {
   win: "assets/win.png",
 };
 
-let currentSum = null;     // résultat “actuel”
-let predicted = null;      // "higher" | "lower" | null
+let currentSum = null;      // résultat actuel (référence)
 let streak = 0;
-let gameState = "idle";    // "idle" | "choose" | "rolling" | "over"
+let gameState = "idle";     // idle | choose | rolling | over
 
 function randDie() {
-  // 1 à 6
   return Math.floor(Math.random() * 6) + 1;
 }
 
@@ -75,16 +73,11 @@ function setGameOver(win) {
   enableChoices(false);
   el.btnRestart.disabled = false;
 
-  if (win) {
-    showOverlay(ASSETS.win, "Victoire");
-  } else {
-    showOverlay(ASSETS.gameover, "Game Over");
-  }
+  showOverlay(win ? ASSETS.win : ASSETS.gameover, win ? "Victoire" : "Game Over");
 }
 
 function resetGame() {
   currentSum = null;
-  predicted = null;
   streak = 0;
   gameState = "idle";
 
@@ -99,96 +92,122 @@ function resetGame() {
   hideOverlay();
 }
 
-function startOrResolveRoll() {
-  if (gameState === "rolling" || gameState === "over") return;
+/**
+ * Animation de dés:
+ * - pendant ~900ms, on change les faces très vite (effet roulette)
+ * - on ajoute une classe CSS rolling pour le "shake"
+ */
+function animateDice(finalRoll, durationMs = 900) {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    const interval = 65; // vitesse de "défilement"
 
-  // 1er lancer : on initialise le "résultat actuel"
-  if (currentSum === null) {
-    gameState = "rolling";
-    el.btnRoll.disabled = true;
-    setMessage("Lancement...");
-    setTimeout(() => {
-      const r = roll2Dice();
-      setDice(r.d1, r.d2, r.sum);
-      currentSum = r.sum;
+    el.die1.classList.add("rolling");
+    el.die2.classList.add("rolling");
 
-      gameState = "choose";
-      el.btnRoll.disabled = true;
-      enableChoices(true);
-      setMessage(`Total actuel: ${currentSum}. Le prochain sera supérieur ou inférieur ?`);
-    }, 250);
+    const timer = setInterval(() => {
+      const temp1 = randDie();
+      const temp2 = randDie();
+      setDice(temp1, temp2, temp1 + temp2);
+
+      const now = performance.now();
+      if (now - start >= durationMs) {
+        clearInterval(timer);
+
+        // Fin: on affiche le vrai résultat
+        setDice(finalRoll.d1, finalRoll.d2, finalRoll.sum);
+
+        el.die1.classList.remove("rolling");
+        el.die2.classList.remove("rolling");
+
+        resolve();
+      }
+    }, interval);
+  });
+}
+
+async function firstRoll() {
+  if (gameState !== "idle") return;
+  gameState = "rolling";
+  el.btnRoll.disabled = true;
+  setMessage("Lancement...");
+
+  const r = roll2Dice();
+  await animateDice(r);
+
+  currentSum = r.sum;
+  gameState = "choose";
+  enableChoices(true);
+  setMessage(`Total actuel: ${currentSum}. Le prochain sera supérieur ou inférieur ?`);
+}
+
+async function resolveChoice(choice) {
+  if (gameState !== "choose") return;
+
+  gameState = "rolling";
+  enableChoices(false);
+  el.btnRoll.disabled = true;
+  setMessage("Lancement...");
+
+  const r = roll2Dice();
+  await animateDice(r);
+
+  const nextSum = r.sum;
+
+  // Egalité => rien ne se passe, on re-choisit, la référence reste currentSum
+  if (nextSum === currentSum) {
+    gameState = "choose";
+    enableChoices(true);
+    setMessage(`Égalité (${currentSum}). Rien ne se passe. Re-choisis.`);
     return;
   }
 
-  // Si on a déjà un currentSum, on ne lance pas tant que le joueur n'a pas choisi
-  if (gameState === "choose") {
-    setMessage("Choisis d'abord : supérieur ou inférieur.");
+  const isHigher = nextSum > currentSum;
+  const correct =
+    (choice === "higher" && isHigher) ||
+    (choice === "lower" && !isHigher);
+
+  if (!correct) {
+    setMessage(`Raté ! (${currentSum} → ${nextSum})`);
+    setGameOver(false);
+    return;
   }
+
+  streak += 1;
+  setStreak(streak);
+
+  if (streak >= GOAL_STREAK) {
+    setMessage(`Gagné ! 6 d'affilée. (${currentSum} → ${nextSum})`);
+    setGameOver(true);
+    return;
+  }
+
+  // On continue : le nouveau devient la référence
+  currentSum = nextSum;
+  gameState = "choose";
+  enableChoices(true);
+  setMessage(`Bien joué ! (${currentSum}). Re-choisis.`);
 }
 
-function choosePrediction(dir) {
-  if (gameState !== "choose") return;
-
-  predicted = dir; // "higher" | "lower"
-  enableChoices(false);
-  el.btnRoll.disabled = true;
-
-  // On lance ensuite automatiquement (ou tu peux préférer un bouton "Confirmer")
-  gameState = "rolling";
-  setMessage("Lancement...");
-
-  setTimeout(() => {
-    const r = roll2Dice();
-    setDice(r.d1, r.d2, r.sum);
-
-    const nextSum = r.sum;
-
-    if (nextSum === currentSum) {
-      // Egalité : rien ne se passe
-      setMessage(`Égalité (${currentSum}). Rien ne se passe. Re-choisis.`);
-      gameState = "choose";
-      enableChoices(true);
-      predicted = null;
-      return;
+// Bonus UX: fermer overlay au clic dehors + ESC
+function setupOverlayUX() {
+  el.overlay.addEventListener("click", (e) => {
+    if (e.target === el.overlay) resetGame();
+  });
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !el.overlay.classList.contains("hidden")) {
+      resetGame();
     }
-
-    const isHigher = nextSum > currentSum;
-    const correct =
-      (predicted === "higher" && isHigher) ||
-      (predicted === "lower" && !isHigher);
-
-    if (!correct) {
-      setMessage(`Raté ! (${currentSum} → ${nextSum})`);
-      setGameOver(false);
-      return;
-    }
-
-    // Bon choix
-    streak += 1;
-    setStreak(streak);
-
-    if (streak >= GOAL_STREAK) {
-      setMessage(`Gagné ! 6 d'affilée. (${currentSum} → ${nextSum})`);
-      setGameOver(true);
-      return;
-    }
-
-    // On continue : le next devient le current
-    setMessage(`Bien joué ! (${currentSum} → ${nextSum}). Re-choisis.`);
-    currentSum = nextSum;
-    predicted = null;
-    gameState = "choose";
-    enableChoices(true);
-  }, 350);
+  });
 }
 
 // Events
-el.btnRoll.addEventListener("click", startOrResolveRoll);
-el.btnHigher.addEventListener("click", () => choosePrediction("higher"));
-el.btnLower.addEventListener("click", () => choosePrediction("lower"));
-
+el.btnRoll.addEventListener("click", firstRoll);
+el.btnHigher.addEventListener("click", () => resolveChoice("higher"));
+el.btnLower.addEventListener("click", () => resolveChoice("lower"));
 el.btnRestart.addEventListener("click", resetGame);
 el.overlayRestart.addEventListener("click", resetGame);
 
 // Init
+setupOverlayUX();
 resetGame();
