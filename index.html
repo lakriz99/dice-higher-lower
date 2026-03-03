@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Plus haut / Plus bas</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <h1>Plus haut / Plus bas</h1>
+      <p class="subtitle">Réussis 6 fois d'affilée.</p>
+    </header>
+
+    <section class="stage">
+      <img id="soldier" class="soldier" src="assets/soldier.png" alt="Personnage" />
+    </section>
+
+    <section class="panel">
+      <div class="dice-row">
+        <div class="die" id="die1">–</div>
+        <div class="die" id="die2">–</div>
+        <div class="sum">
+          Total: <span id="sum">–</span>
+        </div>
+      </div>
+
+      <div class="status-row">
+        <div class="streak">
+          Série: <span id="streak">0</span>/6
+        </div>
+        <div class="message" id="message">Clique sur “Lancer” pour commencer.</div>
+      </div>
+
+      <div class="buttons">
+        <button id="btnRoll" class="primary">🎲 Lancer</button>
+        <button id="btnHigher" disabled>⬆️ Supérieur</button>
+        <button id="btnLower" disabled>⬇️ Inférieur</button>
+        <button id="btnRestart" class="ghost" disabled>↻ Recommencer</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- OVERLAY fin de partie -->
+  <div id="overlay" class="overlay hidden" role="dialog" aria-modal="true">
+    <div class="overlay-card">
+      <img id="overlayImg" class="overlay-img" src="" alt="" />
+      <div class="overlay-actions">
+        <button id="overlayRestart" class="primary">Rejouer</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
