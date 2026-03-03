@@ -4,8 +4,174 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Plus haut / Plus bas</title>
-  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --panel:#121a23;
+      --text:#e8eef6;
+      --muted:#9db0c6;
+      --accent:#6ee7ff;
+      --shadow: 0 20px 60px rgba(0,0,0,.55);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: radial-gradient(1200px 700px at 50% 0%, #142033 0%, var(--bg) 60%);
+      color:var(--text);
+      overflow-x:hidden;
+    }
+
+    .app{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: clamp(12px, 2vw, 18px);
+      display:grid;
+      gap: 14px;
+    }
+
+    .top h1{margin:0;font-weight:900}
+    .subtitle{margin:6px 0 0;color:var(--muted)}
+
+    /* ===== STAGE (FORCE responsive) ===== */
+    .stage{
+      height: min(46vh, 380px);          /* <- cadre fixe, jamais géant */
+      width: 100%;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      display:grid;
+      place-items:center;
+      overflow:hidden;                   /* <- rien ne dépasse */
+    }
+
+    /* FORÇAGE taille image personnage */
+    .soldier{
+      max-height: 100%;
+      max-width: 100%;
+      height: 100%;
+      width: auto;
+      object-fit: contain;
+      display:block;
+      filter: drop-shadow(0 18px 24px rgba(0,0,0,.45));
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+
+    .panel{
+      background: rgba(18, 26, 35, .78);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 18px;
+      padding: 14px;
+      backdrop-filter: blur(10px);
+    }
+
+    .dice-row{
+      display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+    }
+
+    .die{
+      width: 74px; height: 74px;
+      border-radius: 16px;
+      display:grid; place-items:center;
+      font-size: 30px; font-weight: 900;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 10px 25px rgba(0,0,0,.25);
+      user-select:none;
+      will-change: transform;
+    }
+
+    .die.rolling{ animation: shake .35s linear infinite; }
+    @keyframes shake{
+      0%{transform: translate(0,0) rotate(0deg)}
+      20%{transform: translate(-2px,1px) rotate(-3deg)}
+      40%{transform: translate(2px,-1px) rotate(3deg)}
+      60%{transform: translate(-2px,-1px) rotate(-2deg)}
+      80%{transform: translate(2px,1px) rotate(2deg)}
+      100%{transform: translate(0,0) rotate(0deg)}
+    }
+
+    .sum{
+      margin-left:auto;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.10);
+      font-weight: 900;
+    }
+
+    .status-row{ margin-top: 12px; display:flex; gap:12px; flex-wrap:wrap; align-items:baseline; }
+    .streak{ font-weight: 900; }
+    .message{ color: var(--muted); }
+
+    .buttons{ margin-top: 14px; display:flex; flex-wrap:wrap; gap:10px; }
+
+    button{
+      border-radius: 14px;
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.07);
+      color: var(--text);
+      font-weight: 900;
+      cursor:pointer;
+    }
+    button:disabled{ opacity:.45; cursor:not-allowed; }
+    .primary{ border-color: rgba(110,231,255,.45); background: rgba(110,231,255,.14); }
+    .ghost{ background: transparent; }
+
+    /* ===== OVERLAY (vrai popup) ===== */
+    .overlay{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.78);
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      z-index: 999999; /* <- au-dessus de tout */
+    }
+    .hidden{ display:none !important; }
+
+    .overlay-card{
+      width: min(900px, 96vw);
+      max-height: 90vh;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(18, 26, 35, .92);
+      box-shadow: var(--shadow);
+      padding: 12px;
+      animation: pop .16s ease-out;
+      display:flex;
+      flex-direction:column;
+      gap: 10px;
+      align-items:center;
+    }
+    @keyframes pop{
+      from{transform: scale(.96); opacity: .2}
+      to{transform: scale(1); opacity: 1}
+    }
+
+    /* FORÇAGE taille image win/gameover */
+    .overlay-img{
+      width: 100%;
+      height: min(70vh, 560px);
+      object-fit: contain;     /* <- rentre TOUJOURS dans l'écran */
+      display:block;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.25);
+    }
+
+    @media (max-width: 520px){
+      .die{ width: 64px; height: 64px; font-size: 26px; }
+      .stage{ height: min(42vh, 320px); }
+    }
+  </style>
 </head>
+
 <body>
   <main class="app">
     <header class="top">
@@ -21,15 +187,11 @@
       <div class="dice-row">
         <div class="die" id="die1">–</div>
         <div class="die" id="die2">–</div>
-        <div class="sum">
-          Total: <span id="sum">–</span>
-        </div>
+        <div class="sum">Total: <span id="sum">–</span></div>
       </div>
 
       <div class="status-row">
-        <div class="streak">
-          Série: <span id="streak">0</span>/6
-        </div>
+        <div class="streak">Série: <span id="streak">0</span>/6</div>
         <div class="message" id="message">Clique sur “Lancer” pour commencer.</div>
       </div>
 
@@ -42,16 +204,189 @@
     </section>
   </main>
 
-  <!-- OVERLAY fin de partie -->
+  <!-- POPUP -->
   <div id="overlay" class="overlay hidden" role="dialog" aria-modal="true">
     <div class="overlay-card">
       <img id="overlayImg" class="overlay-img" src="" alt="" />
-      <div class="overlay-actions">
-        <button id="overlayRestart" class="primary">Rejouer</button>
-      </div>
+      <button id="overlayRestart" class="primary">Rejouer</button>
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <script>
+    const GOAL_STREAK = 6;
+
+    const el = {
+      die1: document.getElementById("die1"),
+      die2: document.getElementById("die2"),
+      sum: document.getElementById("sum"),
+      streak: document.getElementById("streak"),
+      message: document.getElementById("message"),
+
+      btnRoll: document.getElementById("btnRoll"),
+      btnHigher: document.getElementById("btnHigher"),
+      btnLower: document.getElementById("btnLower"),
+      btnRestart: document.getElementById("btnRestart"),
+
+      overlay: document.getElementById("overlay"),
+      overlayImg: document.getElementById("overlayImg"),
+      overlayRestart: document.getElementById("overlayRestart"),
+    };
+
+    const ASSETS = {
+      gameover: "assets/gameover.png",
+      win: "assets/win.png",
+    };
+
+    let currentSum = null;
+    let streak = 0;
+    let gameState = "idle"; // idle | choose | rolling | over
+
+    function randDie(){ return Math.floor(Math.random()*6)+1; }
+    function roll2Dice(){
+      const d1 = randDie(), d2 = randDie();
+      return { d1, d2, sum: d1 + d2 };
+    }
+
+    function setDice(d1, d2, sum){
+      el.die1.textContent = String(d1);
+      el.die2.textContent = String(d2);
+      el.sum.textContent  = String(sum);
+    }
+
+    function setMessage(t){ el.message.textContent = t; }
+    function setStreak(n){ el.streak.textContent = String(n); }
+
+    function enableChoices(on){
+      el.btnHigher.disabled = !on;
+      el.btnLower.disabled  = !on;
+    }
+
+    function showOverlay(src, alt){
+      el.overlayImg.src = src;
+      el.overlayImg.alt = alt;
+      el.overlay.classList.remove("hidden");
+    }
+
+    function hideOverlay(){
+      el.overlay.classList.add("hidden");
+      el.overlayImg.src = "";
+      el.overlayImg.alt = "";
+    }
+
+    function setGameOver(win){
+      gameState = "over";
+      el.btnRoll.disabled = true;
+      enableChoices(false);
+      el.btnRestart.disabled = false;
+      showOverlay(win ? ASSETS.win : ASSETS.gameover, win ? "Victoire" : "Game Over");
+    }
+
+    function resetGame(){
+      currentSum = null;
+      streak = 0;
+      gameState = "idle";
+      setDice("–","–","–");
+      setStreak(0);
+      setMessage("Clique sur “Lancer” pour commencer.");
+      el.btnRoll.disabled = false;
+      enableChoices(false);
+      el.btnRestart.disabled = true;
+      hideOverlay();
+    }
+
+    // Animation: chiffres qui défilent + shake, puis résultat final
+    function animateDice(finalRoll, durationMs=900){
+      return new Promise((resolve)=>{
+        const start = performance.now();
+        const interval = 60;
+
+        el.die1.classList.add("rolling");
+        el.die2.classList.add("rolling");
+
+        const timer = setInterval(()=>{
+          const a = randDie(), b = randDie();
+          setDice(a,b,a+b);
+
+          if(performance.now() - start >= durationMs){
+            clearInterval(timer);
+            setDice(finalRoll.d1, finalRoll.d2, finalRoll.sum);
+            el.die1.classList.remove("rolling");
+            el.die2.classList.remove("rolling");
+            resolve();
+          }
+        }, interval);
+      });
+    }
+
+    async function firstRoll(){
+      if(gameState !== "idle") return;
+      gameState = "rolling";
+      el.btnRoll.disabled = true;
+      setMessage("Lancement...");
+
+      const r = roll2Dice();
+      await animateDice(r);
+
+      currentSum = r.sum;
+      gameState = "choose";
+      enableChoices(true);
+      setMessage(`Total actuel: ${currentSum}. Le prochain sera supérieur ou inférieur ?`);
+    }
+
+    async function resolveChoice(choice){
+      if(gameState !== "choose") return;
+      gameState = "rolling";
+      enableChoices(false);
+      setMessage("Lancement...");
+
+      const r = roll2Dice();
+      await animateDice(r);
+      const nextSum = r.sum;
+
+      if(nextSum === currentSum){
+        gameState = "choose";
+        enableChoices(true);
+        setMessage(`Égalité (${currentSum}). Rien ne se passe. Re-choisis.`);
+        return;
+      }
+
+      const isHigher = nextSum > currentSum;
+      const correct =
+        (choice === "higher" && isHigher) ||
+        (choice === "lower"  && !isHigher);
+
+      if(!correct){
+        setMessage(`Raté ! (${currentSum} → ${nextSum})`);
+        setGameOver(false);
+        return;
+      }
+
+      streak += 1;
+      setStreak(streak);
+
+      if(streak >= GOAL_STREAK){
+        setMessage(`Gagné ! 6 d'affilée. (${currentSum} → ${nextSum})`);
+        setGameOver(true);
+        return;
+      }
+
+      currentSum = nextSum;
+      gameState = "choose";
+      enableChoices(true);
+      setMessage(`Bien joué ! Total actuel: ${currentSum}. Re-choisis.`);
+    }
+
+    // UX: clic hors popup + ESC
+    el.overlay.addEventListener("click", (e)=>{ if(e.target === el.overlay) resetGame(); });
+    window.addEventListener("keydown", (e)=>{ if(e.key === "Escape" && !el.overlay.classList.contains("hidden")) resetGame(); });
+
+    el.btnRoll.addEventListener("click", firstRoll);
+    el.btnHigher.addEventListener("click", ()=>resolveChoice("higher"));
+    el.btnLower.addEventListener("click", ()=>resolveChoice("lower"));
+    el.btnRestart.addEventListener("click", resetGame);
+    el.overlayRestart.addEventListener("click", resetGame);
+
+    resetGame();
+  </script>
 </body>
 </html>
